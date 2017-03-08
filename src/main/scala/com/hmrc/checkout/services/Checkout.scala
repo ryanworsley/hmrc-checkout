@@ -2,7 +2,7 @@ package com.hmrc.checkout.services
 
 import com.hmrc.checkout.services.Checkout.{Item, Price, Quantity}
 
-class Checkout(priceLookup: Item => Option[Price], discounter: String => (Quantity, Price) => Price) {
+class Checkout private(priceLookup: Item => Option[Price], discounter: String => (Quantity, Price) => Price) {
   def price(items: Seq[Item]): (Price, Set[Item]) = {
     val (found, notFound) = lookupPrices(items)
     val quantityAndPriceByItem = totalQuantities(found)
@@ -15,7 +15,7 @@ class Checkout(priceLookup: Item => Option[Price], discounter: String => (Quanti
     (total, notFound)
   }
 
-  private def lookupPrices(items: Seq[Item]) = items
+  private[this] def lookupPrices(items: Seq[Item]) = items
     .map(item => (item, priceLookup(item)))
     .partition {
       case (_, price) => price.isDefined
@@ -33,13 +33,13 @@ class Checkout(priceLookup: Item => Option[Price], discounter: String => (Quanti
         (foundWithPrice, itemsNotFound.toSet)
     }
 
-  private def totalQuantities(pricedItems: Seq[(Item, Price)]) = pricedItems.groupBy {
+  private[this] def totalQuantities(pricedItems: Seq[(Item, Price)]) = pricedItems.groupBy {
     case ((item, _)) => item
   }.mapValues {
     case items @ (_, price) :: _ => (items.length, price)
   }
 
-  private def getTotalsAndDiscounts(quantityAndPriceByItem: Map[Item, (Quantity, Price)]) = quantityAndPriceByItem.map {
+  private[this] def getTotalsAndDiscounts(quantityAndPriceByItem: Map[Item, (Quantity, Price)]) = quantityAndPriceByItem.map {
     case (item, (quantity, price)) =>
       val total: Price = quantity * price
       val discount: Price = discounter(item.toLowerCase.trim)(quantity, price)
@@ -52,4 +52,7 @@ object Checkout {
   type Quantity = Int
   type Price = BigDecimal
   type Item = String
+
+  def apply(priceLookup: Item => Option[Price], discounter: String => (Quantity, Price) => Price) =
+    new Checkout(priceLookup, discounter)
 }
